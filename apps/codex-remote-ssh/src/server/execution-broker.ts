@@ -423,10 +423,7 @@ export class ExecutionBroker {
     }
 
     if (yieldTimeMs > 0 && session.running) {
-      await Promise.race([
-        new Promise<void>((resolve) => process.once("close", () => resolve())),
-        new Promise<void>((resolve) => setTimeout(resolve, yieldTimeMs)),
-      ]);
+      await this.waitForSession(session, yieldTimeMs);
     }
     return this.result(session);
   }
@@ -710,10 +707,7 @@ export class ExecutionBroker {
     }
     const yieldTimeMs = Math.max(0, Math.min(options.yieldTimeMs ?? 5_000, 12_000));
     if (yieldTimeMs > 0 && session.running) {
-      await Promise.race([
-        new Promise<void>((resolve) => session.process.once("close", () => resolve())),
-        new Promise<void>((resolve) => setTimeout(resolve, yieldTimeMs)),
-      ]);
+      await this.waitForSession(session, yieldTimeMs);
     }
     return this.result(session, options.afterStdoutChars, options.afterStderrChars);
   }
@@ -810,6 +804,28 @@ export class ExecutionBroker {
           startedAt: session.startedAt,
         })),
     );
+  }
+
+  private async waitForSession(session: Session, yieldTimeMs: number): Promise<void> {
+    if (!session.running || yieldTimeMs <= 0) return;
+    await new Promise<void>((resolve) => {
+      let timeout: NodeJS.Timeout | null = null;
+      let settled = false;
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        if (timeout) clearTimeout(timeout);
+        session.process.removeListener("close", onClose);
+        resolve();
+      };
+      const onClose = () => finish();
+      session.process.once("close", onClose);
+      if (!session.running) {
+        finish();
+        return;
+      }
+      timeout = setTimeout(finish, yieldTimeMs);
+    });
   }
 
   private result(session: Session, afterStdoutChars?: number, afterStderrChars?: number): ExecResult {

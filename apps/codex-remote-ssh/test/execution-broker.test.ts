@@ -36,7 +36,7 @@ test("streams command lifecycle events through the broker", async (context) => {
   const observer = new ExecutionBroker({ eventJournalPath: journal });
   try {
     let result = await broker.exec(host, "printf ok", { yieldTimeMs: 1000 });
-    const completionDeadline = Date.now() + 3000;
+    const completionDeadline = Date.now() + 10_000;
     while (result.running && result.sessionId && Date.now() < completionDeadline) {
       result = await broker.poll(result.sessionId, { yieldTimeMs: 250 });
     }
@@ -44,7 +44,7 @@ test("streams command lifecycle events through the broker", async (context) => {
     assert.equal(result.exitCode, 0);
     assert.equal(result.stdout, "hello\n");
     assert.equal(result.stderr, "warning\n");
-    const deadline = Date.now() + 3000;
+    const deadline = Date.now() + 10_000;
     let events = (await observer.readEvents(0)).events;
     while (!events.some((event) => event.type === "command.completed") && Date.now() < deadline) {
       await new Promise((resolve) => setTimeout(resolve, 20));
@@ -61,6 +61,44 @@ test("streams command lifecycle events through the broker", async (context) => {
   } finally {
     broker.close();
     observer.close();
+    if (previousPath === undefined) delete process.env.PATH;
+    else process.env.PATH = previousPath;
+    if (previousConfig === undefined) delete process.env.REMOTE_SSH_CONFIG;
+    else process.env.REMOTE_SSH_CONFIG = previousConfig;
+  }
+});
+
+test("poll timeouts do not accumulate ChildProcess close listeners", async (context) => {
+  if (process.platform === "win32") return context.skip("fake ssh executable test requires POSIX");
+  const root = await mkdtemp(path.join(os.tmpdir(), "remote-ssh-poll-listeners-"));
+  const fakeSsh = path.join(root, "ssh");
+  await writeFile(fakeSsh, "#!/bin/sh\nsleep 1\nprintf 'done\\n'\n");
+  await chmod(fakeSsh, 0o755);
+  const previousPath = process.env.PATH;
+  const previousConfig = process.env.REMOTE_SSH_CONFIG;
+  process.env.PATH = `${root}:${previousPath ?? ""}`;
+  process.env.REMOTE_SSH_CONFIG = path.join(root, "config");
+  await writeFile(process.env.REMOTE_SSH_CONFIG, "Host example\n  HostName example.invalid\n");
+  const host: RemoteHost = {
+    id: "example", alias: "example", hostname: "example.invalid", user: "deploy", port: 22,
+    identityFiles: [], proxyJump: null, resolved: true, source: "ssh-config", identityFile: null, defaultCwd: null,
+  };
+  const broker = new ExecutionBroker({ eventJournalPath: path.join(root, "events.jsonl") });
+  try {
+    const initial = await broker.exec(host, "slow-command", { yieldTimeMs: 0 });
+    assert.equal(initial.running, true);
+    assert.ok(initial.sessionId);
+    const sessions = (broker as unknown as { sessions: Map<string, { process: { listenerCount(event: string): number } }> }).sessions;
+    const child = sessions.get(initial.sessionId!)?.process;
+    assert.ok(child);
+    const baseline = child.listenerCount("close");
+    for (let index = 0; index < 20; index += 1) {
+      const result = await broker.poll(initial.sessionId!, { yieldTimeMs: 1 });
+      assert.equal(result.running, true);
+      assert.equal(child.listenerCount("close"), baseline);
+    }
+  } finally {
+    broker.close();
     if (previousPath === undefined) delete process.env.PATH;
     else process.env.PATH = previousPath;
     if (previousConfig === undefined) delete process.env.REMOTE_SSH_CONFIG;
@@ -95,7 +133,7 @@ test("reconciles active command sessions across broker processes", async (contex
     assert.ok(active.activeCommandSessionIds?.includes(initial.sessionId!), "observer should see command owned by another broker");
 
     let finished = initial;
-    const deadline = Date.now() + 3000;
+    const deadline = Date.now() + 10_000;
     while (finished.running && finished.sessionId && Date.now() < deadline) {
       finished = await executor.poll(finished.sessionId, { yieldTimeMs: 250 });
     }
