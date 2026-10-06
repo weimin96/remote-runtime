@@ -1,3 +1,3 @@
 """Lightweight, profile-driven remote Agent runtime."""
 
-__version__ = "0.99.4"
+__version__ = "0.99.5"

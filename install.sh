@@ -17,7 +17,7 @@ Public repository:
 
 Bootstrap options:
   --ref REF          Install a specific Git ref (default: main)
-  --version VERSION  Install tag vVERSION, for example --version 0.99.4
+  --version VERSION  Install tag vVERSION, for example --version 0.99.5
   --bootstrap-help   Show this bootstrap help without downloading source
 
 All other options are forwarded unchanged to deploy/install-local-runtime.sh.

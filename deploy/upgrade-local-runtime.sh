@@ -162,7 +162,10 @@ github_curl_config() {
 }
 
 download_github_release() {
-  local tag=$1 destination=$2 release_json="$destination/release.json" auth_config="$destination/github-curl.conf"
+  local tag=$1
+  local destination=$2
+  local release_json="$destination/release.json"
+  local auth_config="$destination/github-curl.conf"
   local api_path="repos/$GITHUB_REPOSITORY/releases/tags/$tag"
   local curl_args=(--fail --location --silent --show-error --retry 3 --retry-delay 1)
   local auth_status=0
