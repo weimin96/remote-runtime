@@ -42,6 +42,11 @@ export type RemoteWorkspaceService = {
   protocol: "http" | "tcp";
 };
 
+export type RemoteWorkspaceRoot = {
+  path: string;
+  source: "context" | "default" | "home" | "top-level";
+};
+
 function safeLocalEnvironment(): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = {};
   for (const key of ["HOME", "USER", "LOGNAME", "PATH", "SSH_AUTH_SOCK", "TMPDIR"]) {
@@ -121,6 +126,53 @@ function numberOrZero(value: string | undefined): number {
 
 function serviceId(host: string, workspacePath: string, pid: number, port: number): string {
   return crypto.createHash("sha256").update(`${host}\0${workspacePath}\0${pid}\0${port}`).digest("base64url").slice(0, 18);
+}
+
+function workspaceRootSource(value: string): RemoteWorkspaceRoot["source"] | null {
+  if (value === "context" || value === "default" || value === "home" || value === "top-level") return value;
+  return null;
+}
+
+export async function discoverRemoteWorkspaceRoots(
+  host: RemoteHost,
+  contextCwd?: string | null,
+): Promise<{ roots: RemoteWorkspaceRoot[] }> {
+  const context = contextCwd?.trim() || "";
+  const defaultCwd = host.defaultCwd?.trim() || "";
+  const command = String.raw`
+set -eu
+emit_root() {
+  kind="$1"
+  candidate="$2"
+  [ -n "$candidate" ] || return 0
+  resolved=$(cd -- "$candidate" 2>/dev/null && pwd -P) || return 0
+  printf '__WORKSPACE_ROOT__\t%s\t%s\n' "$kind" "$resolved"
+}
+emit_root context ${shellQuote(context)}
+emit_root default ${shellQuote(defaultCwd)}
+home=$(cd ~ 2>/dev/null && pwd -P || printf '')
+emit_root home "$home"
+for candidate in /*; do
+  [ -d "$candidate" ] || continue
+  [ -r "$candidate" ] && [ -x "$candidate" ] || continue
+  case "$candidate" in
+    /bin|/boot|/dev|/etc|/lib|/lib64|/lost+found|/proc|/run|/sbin|/snap|/sys|/usr) continue ;;
+  esac
+  emit_root top-level "$candidate"
+done
+`;
+  const stdout = await runWorkspaceProbe(host, command, 12_000);
+  const roots: RemoteWorkspaceRoot[] = [];
+  const seen = new Set<string>();
+  for (const line of stdout.split(/\r?\n/)) {
+    if (!line.startsWith("__WORKSPACE_ROOT__\t")) continue;
+    const [, sourceText = "", remotePath = ""] = line.split("\t");
+    const source = workspaceRootSource(sourceText);
+    if (!source || !remotePath || seen.has(remotePath)) continue;
+    seen.add(remotePath);
+    roots.push({ path: remotePath, source });
+  }
+  return { roots };
 }
 
 function classifyWorkspaceService(port: number, processName: string, hint: string): Pick<RemoteWorkspaceService, "kind" | "label" | "protocol"> {
@@ -322,10 +374,15 @@ ss -ltnpH 2>/dev/null | while IFS= read -r line; do
   pid=$(printf '%s\n' "$line" | sed -n 's/.*pid=\([0-9][0-9]*\).*/\1/p' | head -n 1)
   [ -n "$pid" ] || continue
   cwd=$(readlink "/proc/$pid/cwd" 2>/dev/null || printf '')
-  [ -n "$cwd" ] || continue
-  case "$cwd" in "$workspace"|"$workspace"/*) ;; *) continue ;; esac
+  exe=$(readlink "/proc/$pid/exe" 2>/dev/null || printf '')
+  args_raw=$(tr '\000' ' ' < "/proc/$pid/cmdline" 2>/dev/null || printf '')
+  belongs=0
+  case "$cwd" in "$workspace"|"$workspace"/*) belongs=1 ;; esac
+  case "$exe" in "$workspace"|"$workspace"/*) belongs=1 ;; esac
+  case "$args_raw" in *"$workspace"*) belongs=1 ;; esac
+  [ "$belongs" = 1 ] || continue
   proc=$(cat "/proc/$pid/comm" 2>/dev/null | tr '\t\r\n' '   ' || printf '')
-  args=$(tr '\000' ' ' < "/proc/$pid/cmdline" 2>/dev/null | tr '[:upper:]' '[:lower:]' || printf '')
+  args=$(printf '%s' "$args_raw" | tr '[:upper:]' '[:lower:]')
   hint=""
   case "$args" in
     *comfyui*) hint="comfyui" ;;

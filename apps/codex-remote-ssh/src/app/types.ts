@@ -138,6 +138,11 @@ export type RemoteWorkspaceService = {
   protocol: "http" | "tcp";
 };
 
+export type RemoteWorkspaceRoot = {
+  path: string;
+  source: "context" | "default" | "home" | "top-level";
+};
+
 export type SftpEntry = {
   name: string;
   path: string;

@@ -6,7 +6,7 @@ import { HostHealthRegistry } from "./host-health.js";
 import { discoverRemoteHosts, publicHost, type RemoteHost } from "./host-registry.js";
 import { ManagedHostInputSchema, managedHostsPath, removeManagedHost, saveManagedHost } from "./managed-hosts.js";
 import { PortForwardManager } from "./port-forward-manager.js";
-import { discoverRemoteWorkspaceServices, discoverRemoteWorkspaces, inspectRemoteWorkspace } from "./remote-workspaces.js";
+import { discoverRemoteWorkspaceRoots, discoverRemoteWorkspaceServices, discoverRemoteWorkspaces, inspectRemoteWorkspace } from "./remote-workspaces.js";
 import { SftpClient } from "./sftp-client.js";
 import { readServerSnapshot } from "./server-monitor.js";
 import { sshConfigPath } from "./ssh-config.js";
@@ -552,6 +552,24 @@ export async function registerRemoteSsh(server: McpServer, broker: ExecutionBrok
     async ({ host, cwd }) => {
       const remoteHost = await requireHost(host);
       return result({ workspace: await observeHost(remoteHost, "workspace", () => inspectRemoteWorkspace(remoteHost, cwd)) });
+    },
+  );
+
+  server.registerTool(
+    "workspace.roots",
+    {
+      title: "读取远程工作区搜索范围",
+      description: "只读返回当前目录、主机默认目录、登录 HOME 与远端可访问的顶层目录，供 Remote SSH App 选择工作区搜索范围。",
+      inputSchema: z.object({
+        host: z.string().min(1),
+        cwd: z.string().min(1).max(4096).optional(),
+      }),
+      annotations: readonly,
+      _meta: { ui: { visibility: ["app"] } },
+    },
+    async ({ host, cwd }) => {
+      const remoteHost = await requireHost(host);
+      return result(await observeHost(remoteHost, "workspace", () => discoverRemoteWorkspaceRoots(remoteHost, cwd)));
     },
   );
 

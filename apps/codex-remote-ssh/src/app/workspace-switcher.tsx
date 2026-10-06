@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Badge, Box, Button, Dialog, Flex, IconButton, ScrollArea, Select, Text, TextField, Tooltip } from "@radix-ui/themes";
-import { CodeIcon, Cross1Icon, Link2Icon, MagnifyingGlassIcon, ReloadIcon } from "@radix-ui/react-icons";
+import { CodeIcon, Cross1Icon, MagnifyingGlassIcon, ReloadIcon } from "@radix-ui/react-icons";
 
-import { request, requestReadOnly, userFacingError } from "./runtime.js";
-import type { Host, PortForwardInfo, RemoteWorkspace, RemoteWorkspaceService } from "./types.js";
+import { requestReadOnly, userFacingError } from "./runtime.js";
+import type { Host, RemoteWorkspace, RemoteWorkspaceRoot } from "./types.js";
 
 function workspaceSubtitle(workspace: RemoteWorkspace): string {
   const parts: string[] = [];
@@ -26,6 +26,13 @@ function parentRemotePath(value: string): string {
   if (normalized === "/") return "/";
   const index = normalized.lastIndexOf("/");
   return index <= 0 ? "/" : normalized.slice(0, index);
+}
+
+function workspaceRootLabel(root: RemoteWorkspaceRoot): string {
+  if (root.source === "context") return "当前上下文";
+  if (root.source === "default") return "主机默认";
+  if (root.source === "home") return "登录目录";
+  return root.path;
 }
 
 export function WorkspaceSwitcher({
@@ -59,18 +66,13 @@ export function WorkspaceSwitcher({
   const [open, setOpen] = useState(false);
   const [host, setHost] = useState("");
   const [root, setRoot] = useState("");
+  const [rootCandidates, setRootCandidates] = useState<RemoteWorkspaceRoot[]>([]);
+  const [rootsLoading, setRootsLoading] = useState(false);
   const [query, setQuery] = useState("");
   const [discovered, setDiscovered] = useState<RemoteWorkspace[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [services, setServices] = useState<RemoteWorkspaceService[]>([]);
-  const [servicesSupported, setServicesSupported] = useState(true);
-  const [servicesLoading, setServicesLoading] = useState(false);
-  const [servicesLoadedKey, setServicesLoadedKey] = useState("");
-  const [serviceForwards, setServiceForwards] = useState<Record<string, PortForwardInfo>>({});
-  const [forwardingService, setForwardingService] = useState<string | null>(null);
-  const [serviceNotice, setServiceNotice] = useState("");
-  const serviceRequestRef = useRef(0);
+  const rootRequestRef = useRef(0);
 
   useEffect(() => {
     if (!open) return;
@@ -81,96 +83,36 @@ export function WorkspaceSwitcher({
     setError("");
   }, [active, contextCwd, contextHost, open, resolvedHosts]);
 
-  const loadServices = async (force = false) => {
-    if (!active) return;
-    const key = `${active.host}\0${active.path}`;
-    if (!force && servicesLoadedKey === key) return;
-    const requestId = ++serviceRequestRef.current;
-    setServicesLoading(true);
-    setServiceNotice("");
-    if (servicesLoadedKey !== key) {
-      setServices([]);
-      setServiceForwards({});
-      setServicesSupported(true);
-    }
-    try {
-      const [serviceResponse, forwardResponse] = await Promise.all([
-        requestReadOnly<{
-          isError?: boolean;
-          content?: Array<{ text?: string }>;
-          structuredContent?: { supported?: boolean; services?: RemoteWorkspaceService[] };
-        }>("tools/call", {
-          name: "workspace.services",
-          arguments: { host: active.host, workspacePath: active.path },
-        }, 20_000),
-        requestReadOnly<{
-          isError?: boolean;
-          structuredContent?: { forwards?: PortForwardInfo[] };
-        }>("tools/call", { name: "forward.list", arguments: {} }),
-      ]);
-      if (serviceResponse.isError) throw new Error(serviceResponse.content?.[0]?.text ?? "发现项目服务失败");
-      if (requestId !== serviceRequestRef.current) return;
-      const nextServices = serviceResponse.structuredContent?.services ?? [];
-      const nextForwards: Record<string, PortForwardInfo> = {};
-      const forwards = forwardResponse.isError ? [] : forwardResponse.structuredContent?.forwards ?? [];
-      for (const service of nextServices) {
-        const forward = forwards.find((item) => item.status === "running" && item.host === service.host && item.remoteHost === service.remoteHost && item.remotePort === service.port);
-        if (forward) nextForwards[service.id] = forward;
-      }
-      setServices(nextServices);
-      setServicesSupported(serviceResponse.structuredContent?.supported !== false);
-      setServiceForwards(nextForwards);
-      setServicesLoadedKey(key);
-    } catch (nextError) {
-      if (requestId === serviceRequestRef.current) setServiceNotice(userFacingError(nextError, "发现项目服务失败"));
-    } finally {
-      if (requestId === serviceRequestRef.current) setServicesLoading(false);
-    }
-  };
-
   useEffect(() => {
-    if (!open || !active) {
-      serviceRequestRef.current += 1;
-      if (!active) {
-        setServices([]);
-        setServiceForwards({});
-        setServicesLoadedKey("");
-      }
+    if (!open || !host) {
+      setRootCandidates([]);
       return;
     }
-    void loadServices(false);
-    // The active key deliberately controls the one-shot service probe. Git refreshes do not rescan ports.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, active?.host, active?.path]);
-
-  const forwardService = async (service: RemoteWorkspaceService) => {
-    if (forwardingService) return;
-    setForwardingService(service.id);
-    setServiceNotice("");
-    try {
-      const response = await request<{
-        isError?: boolean;
-        content?: Array<{ text?: string }>;
-        structuredContent?: { forward?: PortForwardInfo };
-      }>("tools/call", {
-        name: "forward.open",
-        arguments: {
-          host: service.host,
-          localPort: 0,
-          remoteHost: service.remoteHost,
-          remotePort: service.port,
-        },
-      }, 20_000);
-      if (response.isError || !response.structuredContent?.forward) throw new Error(response.content?.[0]?.text ?? "创建端口转发失败");
-      const forward = response.structuredContent.forward;
-      setServiceForwards((current) => ({ ...current, [service.id]: forward }));
-      setServiceNotice(`${service.label} 已转发到 127.0.0.1:${forward.localPort}`);
-    } catch (nextError) {
-      setServiceNotice(userFacingError(nextError, "创建端口转发失败"));
-    } finally {
-      setForwardingService(null);
-    }
-  };
+    const requestId = ++rootRequestRef.current;
+    setRootsLoading(true);
+    requestReadOnly<{
+      isError?: boolean;
+      content?: Array<{ text?: string }>;
+      structuredContent?: { roots?: RemoteWorkspaceRoot[] };
+    }>("tools/call", {
+      name: "workspace.roots",
+      arguments: {
+        host,
+        ...(contextHost === host && contextCwd ? { cwd: contextCwd } : {}),
+      },
+    }, 15_000).then((response) => {
+      if (requestId !== rootRequestRef.current) return;
+      if (response.isError) throw new Error(response.content?.[0]?.text ?? "读取工作区搜索范围失败");
+      const roots = response.structuredContent?.roots ?? [];
+      setRootCandidates(roots);
+      setRoot((current) => current || roots[0]?.path || "");
+    }).catch((nextError) => {
+      if (requestId === rootRequestRef.current) setError(userFacingError(nextError, "读取工作区搜索范围失败"));
+    }).finally(() => {
+      if (requestId === rootRequestRef.current) setRootsLoading(false);
+    });
+    return () => { rootRequestRef.current += 1; };
+  }, [contextCwd, contextHost, host, open]);
 
   const discover = async () => {
     if (!host || loading) return;
@@ -190,11 +132,11 @@ export function WorkspaceSwitcher({
           maxProjects: 40,
         },
       }, 35_000);
-      if (response.isError) throw new Error(response.content?.[0]?.text ?? "发现远程项目失败");
+      if (response.isError) throw new Error(response.content?.[0]?.text ?? "发现远程工作区失败");
       setDiscovered(response.structuredContent?.workspaces ?? []);
       if (response.structuredContent?.root) setRoot(response.structuredContent.root);
     } catch (nextError) {
-      setError(userFacingError(nextError, "发现远程项目失败"));
+      setError(userFacingError(nextError, "发现远程工作区失败"));
     } finally {
       setLoading(false);
     }
@@ -218,19 +160,19 @@ export function WorkspaceSwitcher({
     try {
       await onRefreshActive();
     } catch (nextError) {
-      setError(userFacingError(nextError, "刷新远程项目失败"));
+      setError(userFacingError(nextError, "刷新远程工作区失败"));
     }
   };
 
   return (
     <Dialog.Root open={open} onOpenChange={setOpen}>
-      <Tooltip content={active ? `${active.host} · ${active.path}` : "选择远程项目"}>
+      <Tooltip content={active ? `${active.host} · ${active.path} · 查看工作区服务` : "选择工作区并统一 Agent、Terminal、SFTP 与服务上下文"}>
         <Dialog.Trigger>
           <button type="button" className={`workspace-switcher-trigger ${active ? "has-workspace" : ""}`}>
             <CodeIcon />
             <span className="workspace-switcher-copy">
-              <strong>{active?.name ?? "项目"}</strong>
-              {active && <small>{active.host}{activeSubtitle ? ` · ${activeSubtitle}` : ""} · {followAgent ? "跟随" : "固定"}</small>}
+              <strong>{active?.name ?? "工作区"}</strong>
+              {active && <small>{active.host}{activeSubtitle ? ` · ${activeSubtitle}` : ""} · {followAgent ? "跟随 Agent" : "已固定"}</small>}
             </span>
           </button>
         </Dialog.Trigger>
@@ -238,16 +180,16 @@ export function WorkspaceSwitcher({
       <Dialog.Content maxWidth="720px" className="workspace-switcher-dialog">
         <Flex justify="between" align="start" gap="3" mb="3">
           <Box>
-            <Dialog.Title>远程项目</Dialog.Title>
-            <Dialog.Description size="2" color="gray">发现项目根目录，并让 Terminal 与 SFTP 使用同一个工作上下文。</Dialog.Description>
+            <Dialog.Title>工作区</Dialog.Title>
+            <Dialog.Description size="2" color="gray">一个工作区 = SSH 主机 + 工程目录 + Git 状态 + 运行服务。Agent、Terminal 与 SFTP 共用这套上下文。</Dialog.Description>
           </Box>
-          <Dialog.Close><IconButton size="2" variant="ghost" color="gray" aria-label="关闭远程项目"><Cross1Icon /></IconButton></Dialog.Close>
+          <Dialog.Close><IconButton size="2" variant="ghost" color="gray" aria-label="关闭工作区"><Cross1Icon /></IconButton></Dialog.Close>
         </Flex>
 
         <div className="workspace-context-strip">
           <div className="workspace-context-copy">
-            <span>当前上下文</span>
-            <strong>{active ? `${active.host} · ${active.name}` : "尚未选择项目"}</strong>
+            <span>当前工作区</span>
+            <strong>{active ? `${active.host} · ${active.name}` : "尚未选择工作区"}</strong>
             {active && <code>{active.path}</code>}
           </div>
           <Flex align="center" gap="2" className="workspace-context-actions">
@@ -258,62 +200,18 @@ export function WorkspaceSwitcher({
               color={followAgent ? "gray" : "jade"}
               onClick={() => onFollowAgentChange(!followAgent)}
             >
-              {followAgent ? "固定当前" : "恢复跟随"}
+              {followAgent ? "固定工作区" : "跟随 Agent"}
             </Button>
           </Flex>
         </div>
-
-        {active && (
-          <section className="workspace-services">
-            <Flex justify="between" align="center" gap="3" className="workspace-services-head">
-              <Box minWidth="0">
-                <Text as="div" size="2" weight="medium">项目服务</Text>
-                <Text as="div" size="1" color="gray">只读取当前项目进程实际监听的 TCP 端口，不后台持续扫描。</Text>
-              </Box>
-              <Button size="1" variant="ghost" color="gray" loading={servicesLoading} onClick={() => void loadServices(true)}><ReloadIcon />刷新</Button>
-            </Flex>
-            <div className="workspace-service-grid">
-              {services.map((service) => {
-                const forward = serviceForwards[service.id];
-                const href = forward && service.protocol === "http" ? `http://127.0.0.1:${forward.localPort}` : null;
-                return (
-                  <div key={service.id} className="workspace-service-card">
-                    <div className="workspace-service-copy">
-                      <Flex align="center" gap="2">
-                        <strong>{service.label}</strong>
-                        <Badge size="1" variant="soft" color={service.protocol === "http" ? "blue" : "gray"}>{service.protocol.toUpperCase()}</Badge>
-                      </Flex>
-                      <span>{service.process} · {service.bindAddress}:{service.port}</span>
-                      <code>{service.cwd}</code>
-                    </div>
-                    {forward ? (
-                      <div className="workspace-service-forwarded">
-                        <span>127.0.0.1:{forward.localPort}</span>
-                        {href && <a href={href} target="_blank" rel="noreferrer">打开</a>}
-                      </div>
-                    ) : (
-                      <Button size="1" variant="soft" loading={forwardingService === service.id} disabled={Boolean(forwardingService)} onClick={() => void forwardService(service)}>
-                        <Link2Icon />转发
-                      </Button>
-                    )}
-                  </div>
-                );
-              })}
-              {!servicesLoading && servicesSupported && services.length === 0 && <div className="workspace-services-empty">当前项目没有检测到监听中的服务</div>}
-              {!servicesLoading && !servicesSupported && <div className="workspace-services-empty">远端缺少 Linux ss / proc，无法识别项目服务</div>}
-              {servicesLoading && services.length === 0 && <div className="workspace-services-empty">正在检测项目服务…</div>}
-            </div>
-            {serviceNotice && <Text as="div" size="1" color={serviceNotice.includes("失败") ? "red" : "gray"} mt="2">{serviceNotice}</Text>}
-          </section>
-        )}
 
         <Flex gap="2" align="end" className="workspace-discovery-form">
           <Box className="workspace-discovery-host">
             <Text as="label" size="1" color="gray">主机</Text>
             <Select.Root value={host || undefined} onValueChange={(value) => {
               setHost(value);
-              const next = resolvedHosts.find((item) => item.id === value);
-              setRoot(next?.defaultCwd ?? "");
+              setRoot("");
+              setRootCandidates([]);
               setDiscovered([]);
             }}>
               <Select.Trigger mt="1" placeholder="选择主机" />
@@ -321,19 +219,38 @@ export function WorkspaceSwitcher({
             </Select.Root>
           </Box>
           <Box className="workspace-discovery-root">
-            <Text as="label" size="1" color="gray">搜索根目录</Text>
-            <TextField.Root mt="1" value={root} onChange={(event) => setRoot(event.target.value)} placeholder="远端登录目录或 /srv/projects" />
+            <Text as="label" size="1" color="gray">搜索范围</Text>
+            <TextField.Root mt="1" value={root} onChange={(event) => setRoot(event.target.value)} placeholder="例如 /opt、/srv、/home/user 或 /data/projects" />
           </Box>
-          <Button size="2" onClick={() => void discover()} loading={loading} disabled={!host}><ReloadIcon />发现</Button>
+          <Button size="2" onClick={() => void discover()} loading={loading} disabled={!host || !root.trim()}><ReloadIcon />发现工作区</Button>
         </Flex>
 
-        <TextField.Root mt="3" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="筛选项目、路径或分支">
+        <div className="workspace-root-candidates">
+          <Text size="1" color="gray">{rootsLoading ? "正在读取远端目录…" : "可用搜索范围"}</Text>
+          <Flex gap="1" wrap="wrap">
+            {rootCandidates.slice(0, 12).map((candidate) => (
+              <Button
+                key={`${candidate.source}:${candidate.path}`}
+                size="1"
+                variant={root === candidate.path ? "solid" : "soft"}
+                color={root === candidate.path ? "jade" : "gray"}
+                onClick={() => setRoot(candidate.path)}
+                title={candidate.path}
+              >
+                {workspaceRootLabel(candidate)}
+                {candidate.source !== "top-level" && <span className="workspace-root-path">{candidate.path}</span>}
+              </Button>
+            ))}
+          </Flex>
+        </div>
+
+        <TextField.Root mt="3" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="筛选工作区、路径或分支">
           <TextField.Slot><MagnifyingGlassIcon /></TextField.Slot>
         </TextField.Root>
         {error && <Text as="div" size="1" color="red" mt="2">{error}</Text>}
 
         <Flex justify="between" align="center" mt="3" mb="1" className="workspace-list-head">
-          <Text size="1" color="gray">{visible.length} 个项目 · 最近 {recents.length}</Text>
+          <Text size="1" color="gray">{visible.length} 个工作区 · 最近 {recents.length}</Text>
           {recents.length > 0 && <Button size="1" variant="ghost" color="gray" onClick={onClearRecents}>清空最近</Button>}
         </Flex>
 
@@ -383,7 +300,7 @@ export function WorkspaceSwitcher({
             })}
             {!visible.length && (
               <div className="workspace-switcher-empty">
-                {loading ? "正在发现项目…" : "暂无项目。选择主机和搜索根目录后点击“发现”。"}
+                {loading ? "正在发现工作区…" : "暂无工作区。选择主机和搜索范围后点击“发现工作区”。"}
               </div>
             )}
           </div>

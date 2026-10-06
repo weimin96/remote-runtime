@@ -5,7 +5,7 @@ import path from "node:path";
 import test from "node:test";
 
 import type { RemoteHost } from "../src/server/host-registry.js";
-import { discoverRemoteWorkspaceServices, discoverRemoteWorkspaces, inspectRemoteWorkspace } from "../src/server/remote-workspaces.js";
+import { discoverRemoteWorkspaceRoots, discoverRemoteWorkspaceServices, discoverRemoteWorkspaces, inspectRemoteWorkspace } from "../src/server/remote-workspaces.js";
 
 function host(): RemoteHost {
   return {
@@ -30,6 +30,12 @@ test("inspects and discovers remote workspaces with git metadata", async (contex
   await writeFile(fakeSsh, `#!/bin/sh
 command_name="$*"
 case "$command_name" in
+  *"__WORKSPACE_ROOT__"*)
+    printf '__WORKSPACE_ROOT__\\tcontext\\t/srv/projects/web\\n'
+    printf '__WORKSPACE_ROOT__\\tdefault\\t/srv/projects\\n'
+    printf '__WORKSPACE_ROOT__\\thome\\t/home/deploy\\n'
+    printf '__WORKSPACE_ROOT__\\ttop-level\\t/opt\\n'
+    ;;
   *"__SERVICE_SUPPORTED__"*)
     printf '__SERVICE_SUPPORTED__\\t1\\n'
     printf '__SERVICE__\\t127.0.0.1\\t5173\\t101\\tnode\\t/srv/projects/web\\tvite\\n'
@@ -64,6 +70,14 @@ esac
     assert.equal(discovered.root, "/srv/projects");
     assert.deepEqual(discovered.workspaces.map((workspace) => workspace.name), ["api", "web"]);
     assert.equal(discovered.workspaces[1].git.branch, "feature/ui");
+
+    const roots = await discoverRemoteWorkspaceRoots(host(), "/srv/projects/web");
+    assert.deepEqual(roots.roots, [
+      { path: "/srv/projects/web", source: "context" },
+      { path: "/srv/projects", source: "default" },
+      { path: "/home/deploy", source: "home" },
+      { path: "/opt", source: "top-level" },
+    ]);
 
     const services = await discoverRemoteWorkspaceServices(host(), "/srv/projects/web");
     assert.equal(services.supported, true);

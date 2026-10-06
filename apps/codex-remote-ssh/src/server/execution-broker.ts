@@ -121,6 +121,8 @@ type HandoffSession = {
   redactionBuffer: string;
   closed: Promise<void>;
   resolveClosed: () => void;
+  attention: Promise<void>;
+  resolveAttention: () => void;
 };
 
 export type ExecResult = {
@@ -492,6 +494,8 @@ export class ExecutionBroker {
     const sessionId = crypto.randomBytes(18).toString("base64url");
     let resolveClosed!: () => void;
     const closed = new Promise<void>((resolve) => { resolveClosed = resolve; });
+    let resolveAttention!: () => void;
+    const attention = new Promise<void>((resolve) => { resolveAttention = resolve; });
     const session: HandoffSession = {
       id: sessionId,
       host,
@@ -513,6 +517,8 @@ export class ExecutionBroker {
       redactionBuffer: "",
       closed,
       resolveClosed,
+      attention,
+      resolveAttention,
     };
     this.handoffSessions.set(sessionId, session);
     this.pushLocal({ type: "handoff.opened", sessionId, host: host.alias, cwd, command, cols, rows, takeoverState: "agent" });
@@ -538,6 +544,7 @@ export class ExecutionBroker {
         if (prompt) {
           session.prompt = prompt;
           session.takeoverState = "awaiting-user";
+          session.resolveAttention();
           this.pushLocal({ type: "handoff.state", sessionId, host: host.alias, takeoverState: "awaiting-user", prompt });
         }
       }
@@ -572,8 +579,8 @@ export class ExecutionBroker {
       cleanup.unref();
     });
 
-    if (yieldTimeMs > 0 && session.running) {
-      await Promise.race([session.closed, new Promise<void>((resolve) => setTimeout(resolve, yieldTimeMs))]);
+    if (yieldTimeMs > 0 && session.running && session.takeoverState === "agent") {
+      await Promise.race([session.closed, session.attention, new Promise<void>((resolve) => setTimeout(resolve, yieldTimeMs))]);
     }
     return this.handoffResult(session);
   }

@@ -146,7 +146,7 @@ curl -fsSL https://raw.githubusercontent.com/weimin96/remote-runtime/main/instal
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/weimin96/remote-runtime/main/install-remote-ssh.sh \
-  | bash -s -- --version 0.99.7
+  | bash -s -- --version 0.99.8
 ```
 
 安装器根据当前 macOS / Linux 架构选择 GitHub Release 中的预编译包，验证 SHA-256 后注册 `remote-ssh@remote-agent`。用户不需要 clone 仓库、执行 `npm install` 或本地编译 `node-pty`。
@@ -160,6 +160,24 @@ npm run check
 ```
 
 插件读取 `~/.ssh/config`，也可以在 UI 中维护独立主机。跳板机使用标准 OpenSSH `ProxyJump`；最终目标主机仍由本机 SSH 凭据完成认证。
+
+Remote SSH 的主要入口：
+
+| 能力 | UI 入口 | 说明 |
+| --- | --- | --- |
+| SSH 主机 | 右上角齿轮 → `SSH 主机` | 合并 `~/.ssh/config` 与插件管理主机；插件配置只保存 `IdentityFile` 路径，不读取私钥内容 |
+| ProxyJump | 齿轮 → `添加 / 更新主机` → `连接方式` → `ProxyJump / 经跳板机` | 使用标准 OpenSSH `-J`；可填写 `~/.ssh/config` 的 Host alias 或 `user@host` |
+| Agent 执行视图 | 顶部 `Agent` | 查看模型发起的命令、长任务状态、stdout/stderr 和 Human Takeover 状态 |
+| 真实 Terminal | 顶部 `Terminal` | 打开真实 PTY，支持交互输入与终端 resize |
+| SFTP | 左侧文件面板 | 浏览、上传、下载、重命名、删除和编辑小型 UTF-8 文本 |
+| 工作区 | 顶部 `工作区` | 统一 SSH 主机、工程目录、Git 状态以及 Agent / Terminal / SFTP 的当前上下文；可从当前 cwd、主机默认目录、HOME 和远端可访问顶层目录选择搜索范围 |
+| 服务发现 | 顶部 `服务` | 只读识别与当前工作区关联的实际监听服务；Linux 远端使用 `ss` + `/proc`，不执行项目脚本、不持续扫描 |
+| Local Forward | 顶部 `端口转发`，或服务卡片的 `转发到本机` | 建立 `127.0.0.1:<local> → remoteHost:remotePort`；仅绑定 loopback，runtime 重启后需重建 |
+| Server Monitor | 点击左上角状态圆点 | 读取 Linux CPU、内存、磁盘和可用 GPU 信息；使用固定只读探针 |
+
+其中 SFTP、Terminal、Workspace / Service Discovery、Local Forward、服务器状态和主机设置主要属于插件 App UI 能力；模型侧保持较小的 SSH 工具面，避免把所有本地操作能力直接暴露给模型。
+
+工作区不是额外的远端配置实体，而是插件当前的 `host + cwd` 上下文。SSH 登录用户的 HOME（例如 root 用户的 `/root`）只是候选搜索范围之一；工作区面板会同时读取当前 Agent cwd、主机默认目录、HOME 以及远端实际存在且可访问的顶层目录，避免把项目发现固定在登录目录。
 
 详细说明见 [Remote SSH README](apps/codex-remote-ssh/README.md)。
 

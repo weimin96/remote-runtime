@@ -1,3 +1,3 @@
 """Remote Runtime gateway package."""
 
-__version__ = "0.99.7"
+__version__ = "0.99.8"

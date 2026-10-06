@@ -114,8 +114,8 @@ export function PortForwardDialog({ hosts }: { hosts: Host[] }) {
   return (
     <Dialog.Root open={open} onOpenChange={setOpen}>
       <Dialog.Trigger>
-        <IconButton
-          className="deck-icon-button"
+        <Button
+          className="deck-action-button"
           size="2"
           variant="ghost"
           color={runningCount ? "green" : "gray"}
@@ -123,7 +123,9 @@ export function PortForwardDialog({ hosts }: { hosts: Host[] }) {
           title={runningCount ? `端口转发 · ${runningCount} 个运行中` : "端口转发"}
         >
           <Link2Icon />
-        </IconButton>
+          <span className="deck-action-label">端口转发</span>
+          {runningCount > 0 && <Badge size="1" variant="soft" color="green">{runningCount}</Badge>}
+        </Button>
       </Dialog.Trigger>
       <Dialog.Content maxWidth="680px" className="forward-dialog">
         <Flex justify="between" align="start" gap="3" mb="4">

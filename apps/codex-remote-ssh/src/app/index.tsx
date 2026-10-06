@@ -49,6 +49,7 @@ import { ServerMonitorDialog } from "./server-monitor-dialog.js";
 import { SftpPanel } from "./sftp-panel.js";
 import type { CommandRun, ConnectionState, HandoffView, Host, HostContext, RemoteWorkspace, TerminalEvent, ToolResult, ViewMode } from "./types.js";
 import { WorkspaceSwitcher } from "./workspace-switcher.js";
+import { WorkspaceServicesDialog } from "./workspace-services-dialog.js";
 
 function StatusDot({ state }: { state: ConnectionState }) {
   return <span className={`connection-dot ${state}`} aria-hidden="true" />;
@@ -895,6 +896,7 @@ function Workspace() {
         </div>
 
         <div className="deck-actions">
+          <WorkspaceServicesDialog workspace={activeWorkspace} />
           <PortForwardDialog hosts={hosts} />
           <Dialog.Root open={settingsOpen} onOpenChange={(open) => { setSettingsOpen(open); if (!open) setSettingsPage("hosts"); }}>
           <Dialog.Trigger>
@@ -906,7 +908,7 @@ function Workspace() {
                   <Flex justify="between" align="start" gap="3" mb="4">
                     <Box>
                       <Dialog.Title>SSH 主机</Dialog.Title>
-                      <Dialog.Description size="2" color="gray">自动合并 OpenSSH 配置和插件管理的主机。</Dialog.Description>
+                      <Dialog.Description size="2" color="gray">自动合并 OpenSSH 配置和插件管理的主机；跳板连接使用标准 ProxyJump。</Dialog.Description>
                     </Box>
                     <Flex align="center" gap="2" flexShrink="0">
                       <Button size="2" onClick={resetHostEditor}><PlusIcon /> 添加 / 更新</Button>
@@ -979,7 +981,7 @@ function Workspace() {
                           <Select.Trigger mt="1" style={{ width: "100%" }} />
                           <Select.Content>
                             <Select.Item value="direct">直连</Select.Item>
-                            <Select.Item value="jump">经跳板机</Select.Item>
+                            <Select.Item value="jump">ProxyJump / 经跳板机</Select.Item>
                           </Select.Content>
                         </Select.Root>
                       </Box>
@@ -1192,7 +1194,7 @@ function AppRoot() {
         hostContext?: HostContext;
       }>("ui/initialize", {
         protocolVersion: "2026-01-26",
-        appInfo: { name: "remote-ssh", version: "0.99.7" },
+        appInfo: { name: "remote-ssh", version: "0.99.8" },
         appCapabilities: { tools: {}, availableDisplayModes: ["inline", "fullscreen"] },
       })
         .then((response) => {
