@@ -186,9 +186,18 @@ import json, re, sys
 release = json.load(open(sys.argv[1], encoding="utf-8"))
 tag = sys.argv[2]
 version = tag[1:] if tag.startswith("v") else tag
-pattern = re.compile(rf"^remote-agent-gateway-v{re.escape(version)}-[A-Za-z0-9._-]+-linux\\.tar\\.gz$")
 assets = release.get("assets") or []
-matches = [asset for asset in assets if pattern.fullmatch(asset.get("name", ""))]
+prefix = f"remote-agent-gateway-v{version}-"
+suffix = "-linux.tar.gz"
+
+def is_runtime_asset(asset):
+    name = asset.get("name", "")
+    if not (name.startswith(prefix) and name.endswith(suffix)):
+        return False
+    build_id = name[len(prefix):-len(suffix)]
+    return bool(build_id) and re.fullmatch(r"[A-Za-z0-9._-]+", build_id) is not None
+
+matches = [asset for asset in assets if is_runtime_asset(asset)]
 if len(matches) != 1:
     raise SystemExit(f"expected exactly one Linux Runtime artifact for {tag}, found {len(matches)}")
 artifact = matches[0]
