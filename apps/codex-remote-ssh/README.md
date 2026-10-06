@@ -12,7 +12,7 @@ Remote SSH 是 Remote Runtime 仓库中的 Codex 插件。它直接复用系统 
 - loopback-only Local Port Forward。
 - Linux CPU / 内存 / 磁盘 / GPU 状态查看。
 
-当前 `0.99.x` 与 Remote Runtime 共用 1.0 RC 版本线。稳定支持 macOS / Linux；Windows 当前为 Experimental。
+`1.0.x` 与 Remote Runtime 共用稳定版本线。稳定发布 macOS arm64/x64 与 Linux x64 预编译包；Windows 当前为 Experimental。
 
 ## 功能入口
 
@@ -61,7 +61,7 @@ curl -fsSL https://raw.githubusercontent.com/weimin96/remote-runtime/main/instal
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/weimin96/remote-runtime/main/install-remote-ssh.sh \
-  | bash -s -- --version 0.99.11
+  | bash -s -- --version 1.0.0
 ```
 
 安装器会自动识别 macOS / Linux 与 CPU 架构，从 GitHub Release 下载对应平台 artifact，校验 SHA-256，然后注册 marketplace 并执行：

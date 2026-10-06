@@ -14,7 +14,7 @@ const forwards = new PortForwardManager();
 const server = new McpServer({
   name: "remote-ssh",
   title: "Remote SSH",
-  version: "0.99.11",
+  version: "1.0.0",
 });
 
 const remoteSsh = await registerRemoteSsh(

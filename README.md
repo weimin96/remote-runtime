@@ -2,13 +2,13 @@
 
 > 面向 AI Coding Agent 的安全远程执行运行时。
 
-[![Release](https://img.shields.io/github/v/release/weimin96/remote-runtime?include_prereleases&sort=semver)](https://github.com/weimin96/remote-runtime/releases)
+[![Release](https://img.shields.io/github/v/release/weimin96/remote-runtime?sort=semver)](https://github.com/weimin96/remote-runtime/releases)
 [![Python](https://img.shields.io/badge/python-3.11%2B-3776ab)](https://www.python.org/)
 [![License](https://img.shields.io/badge/license-Apache--2.0-0f766e)](LICENSE)
 
 Remote Runtime 为 ChatGPT、Codex 和其他 MCP Client 提供一个稳定的远程执行入口。它把认证、能力发现、命令执行、文件操作和远端设备连接集中到一套运行时中，而不是让每台机器分别暴露 MCP Server。
 
-当前 `0.99.x` 为 1.0 RC 版本线，重点是稳定性、兼容性和发布工程。建议先在受控环境中使用。
+`1.0.x` 是首个稳定版本线，面向公开安装、升级和日常远程开发使用。
 
 ## 能力概览
 
@@ -146,7 +146,7 @@ curl -fsSL https://raw.githubusercontent.com/weimin96/remote-runtime/main/instal
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/weimin96/remote-runtime/main/install-remote-ssh.sh \
-  | bash -s -- --version 0.99.11
+  | bash -s -- --version 1.0.0
 ```
 
 安装器根据当前 macOS / Linux 架构选择 GitHub Release 中的预编译包，验证 SHA-256 后注册 `remote-ssh@remote-agent`。用户不需要 clone 仓库、执行 `npm install` 或本地编译 `node-pty`。
@@ -218,7 +218,7 @@ Remote Runtime 的设计目标是减少远程执行系统中不必要的权限�
 | --- | --- | --- |
 | Gateway / Local Runtime | Linux + systemd | 生产部署基线 |
 | Remote Agent | Linux / macOS / Windows | Python 3.11+ |
-| Remote SSH | macOS / Linux | Windows 当前为 Experimental |
+| Remote SSH | macOS arm64/x64、Linux x64 | Windows 当前为 Experimental；Linux arm64 暂未发布预编译包 |
 
 ## 开发
 

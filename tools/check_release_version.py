@@ -57,7 +57,7 @@ def read_versions() -> dict[str, str]:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Verify that release version sources match a tag")
-    parser.add_argument("tag", nargs="?", help="Expected tag, for example v0.99.11")
+    parser.add_argument("tag", nargs="?", help="Expected tag, for example v1.0.0")
     args = parser.parse_args()
 
     versions = read_versions()
