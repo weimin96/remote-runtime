@@ -117,7 +117,7 @@ git push origin "v$VERSION"
 
 Tag push 会触发 `Release` workflow：
 
-1. Ubuntu 完整执行 `scripts/verify-release.sh`。
+1. Ubuntu fresh runner 依次执行版本校验、Python tests/compile、Remote SSH check、Git whitespace 和 Linux artifact 双份可重复构建校验。
 2. Linux/macOS 原生 runner 分别构建 Remote SSH native artifact。
 3. Runtime job 构建 wheel / Linux Runtime，并附带一键安装脚本。
 4. Publish job 汇总 artifact、生成 `SHA256SUMS.txt` 并创建 GitHub Release。

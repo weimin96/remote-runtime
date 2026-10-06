@@ -16,6 +16,7 @@ concurrency:
 jobs:
   verify:
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -40,12 +41,49 @@ jobs:
           else
             .venv/bin/python tools/check_release_version.py
           fi
-      - name: Run release gate
-        run: ./scripts/verify-release.sh
+      - name: Run Python tests
+        run: .venv/bin/python -m unittest discover -q
+      - name: Compile Python and check Gateway JavaScript
+        run: |
+          .venv/bin/python -m compileall -q gateway remote_agent agent.py tests
+          node --check gateway/static/app.js
+      - name: Check Remote SSH
+        run: npm --prefix apps/codex-remote-ssh run check
+      - name: Check Git whitespace
+        run: git diff --check
+      - name: Verify reproducible Linux artifacts
+        run: |
+          first=$(mktemp -d)
+          second=$(mktemp -d)
+          trap 'rm -rf "$first" "$second"' EXIT
+          .venv/bin/python tools/build_local_release.py --output-dir "$first" >/dev/null
+          .venv/bin/python tools/build_local_release.py --output-dir "$second" >/dev/null
+          .venv/bin/python tools/build_remote_ssh_release.py --output-dir "$first" >/dev/null
+          .venv/bin/python tools/build_remote_ssh_release.py --output-dir "$second" >/dev/null
+          .venv/bin/python - "$first" "$second" <<'PY'
+          from pathlib import Path
+          import hashlib
+          import sys
+
+          def hashes(root: Path) -> dict[str, str]:
+              return {
+                  path.name: hashlib.sha256(path.read_bytes()).hexdigest()
+                  for path in sorted(root.iterdir())
+                  if path.is_file()
+              }
+
+          first = hashes(Path(sys.argv[1]))
+          second = hashes(Path(sys.argv[2]))
+          if first != second:
+              raise SystemExit(f"release artifacts are not reproducible: {first=} {second=}")
+          for name, digest in first.items():
+              print(f"{digest}  {name}")
+          PY
 
   runtime:
     needs: verify
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -66,6 +104,7 @@ jobs:
 
   remote-ssh:
     needs: verify
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
@@ -103,6 +142,7 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v')
     needs: [runtime, remote-ssh]
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     permissions:
       contents: write
     steps:
