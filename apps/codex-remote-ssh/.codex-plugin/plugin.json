@@ -1,6 +1,6 @@
 {
   "name": "remote-ssh",
-  "version": "0.99.10",
+  "version": "0.99.11",
   "description": "Run Codex commands on SSH hosts and watch the live terminal output.",
   "author": {
     "name": "Remote Runtime"
@@ -14,6 +14,7 @@
     "category": "Developer Tools",
     "capabilities": ["Interactive", "Read", "Write"],
     "composerIcon": "./assets/icon.svg",
+    "composerIconDark": "./assets/icon-dark.svg",
     "logo": "./assets/icon.svg",
     "logoDark": "./assets/icon-dark.svg",
     "defaultPrompt": ["@Remote SSH list my configured SSH hosts."]
