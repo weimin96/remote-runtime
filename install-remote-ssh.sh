@@ -238,13 +238,58 @@ restore_previous() {
   fi
 }
 
-if ! codex plugin marketplace add "$INSTALL_DIR" --json; then
-  restore_previous
-  echo "Failed to register the Remote Runtime marketplace." >&2
-  exit 1
+marketplaces_json="$temp_dir/marketplaces.json"
+previous_marketplace_root=
+previous_marketplace_source=
+if codex plugin marketplace list --json >"$marketplaces_json" 2>/dev/null; then
+  marketplace_state="$temp_dir/marketplace-state.txt"
+  node - "$marketplaces_json" >"$marketplace_state" <<'NODE'
+const fs = require("fs");
+const path = process.argv[2];
+const parsed = JSON.parse(fs.readFileSync(path, "utf8"));
+const marketplaces = Array.isArray(parsed.marketplaces) ? parsed.marketplaces : [];
+const entry = marketplaces.find((item) => item && item.name === "remote-agent");
+if (entry) {
+  console.log(String(entry.root || ""));
+  console.log(String(entry.marketplaceSource?.source || entry.root || ""));
+}
+NODE
+  previous_marketplace_root=$(sed -n '1p' "$marketplace_state")
+  previous_marketplace_source=$(sed -n '2p' "$marketplace_state")
+fi
+
+marketplace_changed=0
+restore_marketplace() {
+  if [[ "$marketplace_changed" != 1 ]]; then
+    return 0
+  fi
+  codex plugin marketplace remove remote-agent --json >/dev/null 2>&1 || true
+  if [[ -n "$previous_marketplace_source" ]]; then
+    codex plugin marketplace add "$previous_marketplace_source" --json >/dev/null 2>&1 || true
+  fi
+}
+
+if [[ -n "$previous_marketplace_root" && "$previous_marketplace_root" != "$INSTALL_DIR" ]]; then
+  if ! codex plugin marketplace remove remote-agent --json >/dev/null; then
+    restore_previous
+    echo "Failed to replace the existing remote-agent marketplace registration." >&2
+    exit 1
+  fi
+  marketplace_changed=1
+fi
+
+if [[ "$previous_marketplace_root" != "$INSTALL_DIR" ]]; then
+  marketplace_changed=1
+  if ! codex plugin marketplace add "$INSTALL_DIR" --json; then
+    restore_previous
+    restore_marketplace
+    echo "Failed to register the Remote Runtime marketplace." >&2
+    exit 1
+  fi
 fi
 if ! codex plugin add remote-ssh@remote-agent --json; then
   restore_previous
+  restore_marketplace
   echo "Failed to install remote-ssh@remote-agent." >&2
   exit 1
 fi

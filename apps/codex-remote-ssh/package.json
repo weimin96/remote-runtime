@@ -1,6 +1,6 @@
 {
   "name": "codex-remote-ssh",
-  "version": "0.99.8",
+  "version": "0.99.9",
   "private": true,
   "type": "module",
   "engines": {

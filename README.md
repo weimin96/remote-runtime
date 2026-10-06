@@ -146,7 +146,7 @@ curl -fsSL https://raw.githubusercontent.com/weimin96/remote-runtime/main/instal
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/weimin96/remote-runtime/main/install-remote-ssh.sh \
-  | bash -s -- --version 0.99.8
+  | bash -s -- --version 0.99.9
 ```
 
 安装器根据当前 macOS / Linux 架构选择 GitHub Release 中的预编译包，验证 SHA-256 后注册 `remote-ssh@remote-agent`。用户不需要 clone 仓库、执行 `npm install` 或本地编译 `node-pty`。

@@ -28,6 +28,8 @@ class RemoteSshInstallerTests(unittest.TestCase):
         self.assertIn("application/octet-stream", text)
         self.assertIn("artifact.url", text)
         self.assertIn("checksum mismatch", text)
+        self.assertIn("codex plugin marketplace list --json", text)
+        self.assertIn("codex plugin marketplace remove remote-agent --json", text)
         self.assertIn('codex plugin marketplace add "$INSTALL_DIR" --json', text)
         self.assertIn("codex plugin add remote-ssh@remote-agent --json", text)
         self.assertNotIn("git clone", text)
