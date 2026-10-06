@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-APP_DIR=/opt/remote-agent-gateway
+APP_DIR=/opt/remote-agent
 ENV_FILE=/etc/remote-agent-gateway.env
 SERVICE_NAME=remote-agent-gateway
 ALLOW_DIRTY=0
@@ -23,7 +23,7 @@ Usage:
   sudo ./deploy/upgrade-local-runtime.sh list [options]
 
 Options:
-  --app-dir DIR       Managed application root (default: /opt/remote-agent-gateway)
+  --app-dir DIR       Managed application root (default: /opt/remote-agent)
   --env-file PATH     Gateway env file (default: /etc/remote-agent-gateway.env)
   --service NAME      systemd service (default: remote-agent-gateway)
   --github-repo REPO  GitHub repository (default: weimin96/remote-runtime)

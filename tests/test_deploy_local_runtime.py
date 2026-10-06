@@ -49,6 +49,8 @@ class LocalRuntimeDeploymentTests(unittest.TestCase):
 
     def test_installer_is_host_agnostic(self) -> None:
         text = self.installer.read_text(encoding="utf-8")
+        self.assertIn("APP_DIR=/opt/remote-agent", text)
+        self.assertNotIn("APP_DIR=/opt/remote-agent-gateway", text)
         self.assertIn("--public-url", text)
         self.assertIn("--workdir", text)
         self.assertIn("--allow-workdir", text)
@@ -120,6 +122,8 @@ class LocalRuntimeDeploymentTests(unittest.TestCase):
         )
         self.assertEqual(syntax.returncode, 0, syntax.stderr)
         text = upgrade.read_text(encoding="utf-8")
+        self.assertIn("APP_DIR=/opt/remote-agent", text)
+        self.assertNotIn("APP_DIR=/opt/remote-agent-gateway", text)
         self.assertIn('RELEASES_DIR="$APP_DIR/releases"', text)
         self.assertIn('CURRENT_LINK="$APP_DIR/current"', text)
         self.assertIn('PREVIOUS_LINK="$APP_DIR/previous"', text)
@@ -150,6 +154,14 @@ class LocalRuntimeDeploymentTests(unittest.TestCase):
         self.assertGreater(text.index("/usr/local/sbin/remote-agent-doctor"), health_index)
         self.assertNotIn('rm -rf "$GATEWAY_DATA_DIR"', text)
         self.assertNotIn('rm -f "$ENV_FILE"', text)
+
+    def test_systemd_example_matches_default_app_dir(self) -> None:
+        service = (self.root / "deploy" / "remote-agent-gateway.service.example").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("WorkingDirectory=/opt/remote-agent", service)
+        self.assertIn("ExecStart=/opt/remote-agent/current/.venv/bin/python -m gateway", service)
+        self.assertNotIn("/opt/remote-agent-gateway/current", service)
 
     def test_release_builder_declares_deterministic_inputs(self) -> None:
         builder = self.root / "tools" / "build_local_release.py"

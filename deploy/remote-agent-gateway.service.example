@@ -8,10 +8,10 @@ Type=simple
 User=remote-agent-gateway
 Group=remote-agent-workspace
 SupplementaryGroups=remote-agent-control
-WorkingDirectory=/opt/remote-agent-gateway
+WorkingDirectory=/opt/remote-agent
 EnvironmentFile=/etc/remote-agent-gateway.env
 Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-ExecStart=/opt/remote-agent-gateway/current/.venv/bin/python -m gateway
+ExecStart=/opt/remote-agent/current/.venv/bin/python -m gateway
 Restart=on-failure
 RestartSec=3
 TimeoutStopSec=15

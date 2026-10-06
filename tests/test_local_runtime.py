@@ -95,7 +95,15 @@ class LocalCommandRuntimeTests(unittest.IsolatedAsyncioTestCase):
             rows=24,
         )
         self.assertTrue(result["running"])
-        self.assertIn("24 100", result["output"])
+        initial_output = result["output"]
+        if "24 100" not in initial_output:
+            polled = await self.runtime.write_stdin(
+                "owner-1",
+                str(result["session_id"]),
+                yield_time_ms=1000,
+            )
+            initial_output += polled["output"]
+        self.assertIn("24 100", initial_output)
         completed = await self.runtime.write_stdin(
             "owner-1",
             str(result["session_id"]),

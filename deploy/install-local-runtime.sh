@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-APP_DIR=/opt/remote-agent-gateway
+APP_DIR=/opt/remote-agent
 DATA_DIR=/var/lib/remote-agent-gateway
 WORK_DIR=/srv/remote-agent-workspace
 ALLOW_WORKDIRS=()
@@ -38,7 +38,7 @@ Options:
   --workdir DIR           AI workspace root (default: /srv/remote-agent-workspace)
   --allow-workdir DIR     Add another allowed workspace root; may be repeated
   --data-dir DIR          Gateway private data directory (default: /var/lib/remote-agent-gateway)
-  --app-dir DIR           Python runtime directory (default: /opt/remote-agent-gateway)
+  --app-dir DIR           Python runtime directory (default: /opt/remote-agent)
   --env-file PATH         Gateway env file (default: /etc/remote-agent-gateway.env)
   --service NAME          systemd service name (default: remote-agent-gateway)
   --python PATH           Python >=3.11. If omitted, discover system Python or use installed uv
