@@ -1,0 +1,156 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: apps/codex-remote-ssh/package-lock.json
+      - name: Install Python dependencies
+        run: |
+          python -m venv .venv
+          .venv/bin/python -m pip install --upgrade pip
+          .venv/bin/python -m pip install build -e .
+      - name: Install Remote SSH dependencies
+        run: npm ci --prefix apps/codex-remote-ssh --no-audit --no-fund
+      - name: Verify release version
+        run: |
+          if [[ "${GITHUB_REF_TYPE:-}" == "tag" ]]; then
+            .venv/bin/python tools/check_release_version.py "$GITHUB_REF_NAME"
+          else
+            .venv/bin/python tools/check_release_version.py
+          fi
+      - name: Run release gate
+        run: ./scripts/verify-release.sh
+
+  runtime:
+    needs: verify
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install build tooling
+        run: python -m pip install --upgrade build
+      - name: Build Runtime release
+        run: |
+          mkdir -p dist/release
+          python tools/build_local_release.py --output-dir dist/release
+          cp install-remote-ssh.sh dist/release/install-remote-ssh.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: runtime
+          path: dist/release/*
+          if-no-files-found: error
+
+  remote-ssh:
+    needs: verify
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            artifact: remote-ssh-linux-x64
+          - runner: macos-15
+            artifact: remote-ssh-darwin-arm64
+          - runner: macos-15-intel
+            artifact: remote-ssh-darwin-x64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: apps/codex-remote-ssh/package-lock.json
+      - name: Install Remote SSH dependencies
+        run: npm ci --prefix apps/codex-remote-ssh --no-audit --no-fund
+      - name: Build platform package
+        run: |
+          mkdir -p dist/release
+          python tools/build_remote_ssh_release.py --output-dir dist/release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: dist/release/*
+          if-no-files-found: error
+
+  publish:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [runtime, remote-ssh]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist/release
+          merge-multiple: true
+      - name: Validate and checksum release files
+        run: |
+          python tools/check_release_version.py "$GITHUB_REF_NAME"
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib
+
+          root = Path("dist/release")
+          required = [
+              "install-remote-ssh.sh",
+          ]
+          for name in required:
+              if not (root / name).is_file():
+                  raise SystemExit(f"missing release file: {name}")
+          remote = sorted(root.glob("remote-ssh-*.tar.gz"))
+          platforms = {name.name.rsplit("-", 2)[-2] + "-" + name.name.rsplit("-", 2)[-1].removesuffix(".tar.gz") for name in remote}
+          expected = {"linux-x64", "darwin-arm64", "darwin-x64"}
+          if platforms != expected:
+              raise SystemExit(f"unexpected Remote SSH platforms: {platforms}")
+          files = sorted([*root.glob("*.whl"), *root.glob("*.tar.gz"), root / "install-remote-ssh.sh"])
+          lines = []
+          for path in files:
+              digest = hashlib.sha256(path.read_bytes()).hexdigest()
+              lines.append(f"{digest}  {path.name}")
+          (root / "SHA256SUMS.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
+          PY
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version=${GITHUB_REF_NAME#v}
+          release_args=(--verify-tag --generate-notes --title "Remote Runtime $GITHUB_REF_NAME")
+          if [[ "$version" == 0.* ]]; then
+            release_args+=(--prerelease)
+          fi
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" dist/release/* --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" dist/release/* "${release_args[@]}"
+          fi

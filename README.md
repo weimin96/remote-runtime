@@ -136,7 +136,22 @@ docker compose up --build
 
 Remote SSH 位于 `apps/codex-remote-ssh`。发布包包含已构建 UI/MCP bundle 和对应平台的 `node-pty` native runtime。
 
-源码开发：
+普通用户直接一键安装最新发布包：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/weimin96/remote-runtime/main/install-remote-ssh.sh | bash
+```
+
+固定版本：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/weimin96/remote-runtime/main/install-remote-ssh.sh \
+  | bash -s -- --version 0.99.7
+```
+
+安装器根据当前 macOS / Linux 架构选择 GitHub Release 中的预编译包，验证 SHA-256 后注册 `remote-ssh@remote-agent`。用户不需要 clone 仓库、执行 `npm install` 或本地编译 `node-pty`。
+
+源码开发仅用于贡献者：
 
 ```bash
 cd apps/codex-remote-ssh
@@ -210,6 +225,8 @@ npm run check
 ```
 
 该门禁包含 Python 测试/编译、Remote SSH fresh install/typecheck/test/build、Git whitespace 检查和 release artifact 可重复构建验证。
+
+官方 Tag 由 GitHub Actions 在 Linux x64、macOS arm64 和 macOS Intel 原生 runner 上构建，并自动上传 Runtime、Remote SSH 平台包、安装器与总校验文件。普通用户只消费 Release artifact，不需要源码构建环境。
 
 开发前请阅读：
 

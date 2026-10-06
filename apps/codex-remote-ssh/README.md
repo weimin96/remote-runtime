@@ -14,7 +14,30 @@ Remote SSH 是 Remote Runtime 仓库中的 Codex 插件。它直接复用系统 
 
 当前 `0.99.x` 与 Remote Runtime 共用 1.0 RC 版本线。稳定支持 macOS / Linux；Windows 当前为 Experimental。
 
-## 安装发布包
+## 一键安装
+
+推荐直接安装 GitHub Release 的预编译包：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/weimin96/remote-runtime/main/install-remote-ssh.sh | bash
+```
+
+固定版本：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/weimin96/remote-runtime/main/install-remote-ssh.sh \
+  | bash -s -- --version 0.99.7
+```
+
+安装器会自动识别 macOS / Linux 与 CPU 架构，从 GitHub Release 下载对应平台 artifact，校验 SHA-256，然后注册 marketplace 并执行：
+
+```text
+codex plugin add remote-ssh@remote-agent
+```
+
+不会 clone 源码、运行 `npm install` 或在用户机器上编译 `node-pty`。安装后新建一个 Codex thread 即可使用新 runtime。
+
+### 手动安装发布包
 
 GitHub Release 中的：
 

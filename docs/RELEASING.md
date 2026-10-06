@@ -1,6 +1,6 @@
 # Release guide
 
-Remote Runtime 当前由维护者显式执行测试、构建、Tag 和 GitHub Release；仓库不依赖 GitHub Actions 完成发布。
+Remote Runtime 使用 `.github/workflows/release.yml` 完成官方发布。维护者负责版本修改、Release gate 和 Tag；GitHub Actions 在原生平台 runner 上重新验证、构建并发布 artifact。
 
 ## Versioning
 
@@ -44,6 +44,8 @@ git status --short --branch
 
 Remote SSH 含 `node-pty` native runtime。macOS 和 Linux 发布包必须分别在对应平台构建并实际加载 native module，不能跨平台改文件名冒充产物。
 
+需要只验证 CI 打包流程而不创建 Release 时，可在 GitHub Actions 手动运行 `Release` workflow。`workflow_dispatch` 会执行测试和所有平台构建，但不会发布 Release。
+
 ## Version sources
 
 发版前确认这些位置一致：
@@ -81,6 +83,7 @@ remote-agent-gateway-v<version>-<commit>-linux.tar.gz.sha256
 remote_agent_gateway-<version>-py3-none-any.whl
 remote-ssh-v<version>-<commit>-<platform>.tar.gz
 remote-ssh-v<version>-<commit>-<platform>.tar.gz.sha256
+install-remote-ssh.sh
 ```
 
 汇总所有平台包后生成总校验文件：
@@ -90,34 +93,36 @@ cd dist/release
 sha256sum *.whl *.tar.gz > SHA256SUMS.txt
 ```
 
+官方 Action 当前生成：
+
+- Linux x64 Remote SSH
+- macOS arm64 Remote SSH
+- macOS Intel Remote SSH
+- Linux Runtime / Python wheel
+- `install-remote-ssh.sh`
+- `SHA256SUMS.txt`
+
 `dist/` 不提交 Git。
 
 ## Tag and GitHub Release
 
-确认 `main` 已推送且远端 commit 与本地一致，然后：
+确认版本源一致、`main` 已推送且远端 commit 与本地一致，然后创建 Tag：
 
 ```bash
 VERSION=<version>
+python tools/check_release_version.py "v$VERSION"
 git tag -a "v$VERSION" -m "Remote Runtime v$VERSION"
 git push origin "v$VERSION"
 ```
 
-创建 RC / prerelease：
+Tag push 会触发 `Release` workflow：
 
-```bash
-gh release create "v$VERSION" \
-  dist/release/*.whl \
-  dist/release/*.tar.gz \
-  dist/release/*.tar.gz.sha256 \
-  dist/release/SHA256SUMS.txt \
-  --repo weimin96/remote-runtime \
-  --verify-tag \
-  --prerelease \
-  --generate-notes \
-  --title "Remote Runtime v$VERSION"
-```
+1. Ubuntu 完整执行 `scripts/verify-release.sh`。
+2. Linux/macOS 原生 runner 分别构建 Remote SSH native artifact。
+3. Runtime job 构建 wheel / Linux Runtime，并附带一键安装脚本。
+4. Publish job 汇总 artifact、生成 `SHA256SUMS.txt` 并创建 GitHub Release。
 
-1.0 stable 或其他稳定 Release 必须显式决定，不从版本号或提交信息自动推断。
+当前 `0.x` Tag 自动标记为 prerelease；`1.x` 及以上不自动加 prerelease 标记。已经公开的 Tag 不得移动，发布流程修复使用新的 PATCH。
 
 ## Release notes
 
@@ -139,7 +144,8 @@ Release Notes 面向用户，至少说明：
 2. Release 的 draft/prerelease 状态正确。
 3. 所有平台产物和 checksum 已上传。
 4. 从 GitHub 重新下载产物并按 `SHA256SUMS.txt` 验证。
-5. `main` 与 `origin/main` 同步。
-6. 工作树没有 Secret、构建产物或未提交修改。
+5. `install-remote-ssh.sh --version <version>` 能在至少一个真实支持平台完成 Release artifact 安装 smoke。
+6. `main` 与 `origin/main` 同步。
+7. 工作树没有 Secret、构建产物或未提交修改。
 
 发现发布错误时发布新的 PATCH；不要重写已经公开的 Tag。
