@@ -363,8 +363,6 @@ export class ExecutionBroker {
       }, timeoutMs),
     };
     this.sessions.set(sessionId, session);
-    await this.syncPresence();
-    this.pushShared({ type: "command.started", sessionId, host: host.alias, cwd, command });
     process.stdout.on("data", (data: string) => {
       session.stdout = this.appendCapture(session.stdout, data);
       const recent = this.appendIncremental(session.stdoutRecent, session.stdoutRecentStart, session.stdoutChars, data);
@@ -407,6 +405,13 @@ export class ExecutionBroker {
       const cleanup = setTimeout(() => this.sessions.delete(sessionId), 10 * 60 * 1000);
       cleanup.unref();
     });
+
+    // Register every child-process listener before the first await. A very fast
+    // command can exit while presence state is being persisted; registering the
+    // close listener afterwards would miss the event and leave the session
+    // permanently marked as running.
+    this.pushShared({ type: "command.started", sessionId, host: host.alias, cwd, command });
+    await this.syncPresence();
 
     try {
       if (options.stdin !== undefined && options.stdin.length > 0) {
