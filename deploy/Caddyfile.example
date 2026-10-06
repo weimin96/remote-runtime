@@ -1,0 +1,4 @@
+gateway.example.com {
+    reverse_proxy gateway:8000
+}
+

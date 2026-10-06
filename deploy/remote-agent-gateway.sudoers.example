@@ -1,0 +1,9 @@
+# Install with visudo, for example:
+#   sudo install -m 0440 deploy/remote-agent-gateway.sudoers.example /etc/sudoers.d/remote-agent-gateway
+#
+# The Gateway control-plane user may only become the dedicated runner account,
+# never root. Keep the executable paths aligned with the shell discovered on
+# the deployment host.
+
+Defaults:remote-agent-gateway !requiretty
+remote-agent-gateway ALL=(remote-agent-runner) NOPASSWD: /bin/bash, /usr/bin/bash, /bin/sh, /usr/bin/id

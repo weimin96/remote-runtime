@@ -1,0 +1,10 @@
+{
+  "runtime": "python",
+  "agent_version": "0.99.3",
+  "core_version": 6,
+  "build_id": "source-dev",
+  "profiles": [
+    "shell.v1",
+    "workspace.v1"
+  ]
+}

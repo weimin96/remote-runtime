@@ -1,0 +1,28 @@
+[Unit]
+Description=Remote Runtime
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=remote-agent-gateway
+Group=remote-agent-workspace
+SupplementaryGroups=remote-agent-control
+WorkingDirectory=/opt/remote-agent-gateway
+EnvironmentFile=/etc/remote-agent-gateway.env
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+ExecStart=/opt/remote-agent-gateway/current/.venv/bin/python -m gateway
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=15
+UMask=0077
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+LockPersonality=true
+RestrictRealtime=true
+
+[Install]
+WantedBy=multi-user.target

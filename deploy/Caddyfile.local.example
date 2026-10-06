@@ -1,0 +1,17 @@
+gateway.example.com {
+    @public_mcp path \
+        /.well-known/oauth-protected-resource \
+        /.well-known/oauth-protected-resource/* \
+        /.well-known/oauth-authorization-server \
+        /oauth/* \
+        /mcp \
+        /mcp/*
+
+    handle @public_mcp {
+        reverse_proxy 127.0.0.1:8000
+    }
+
+    handle {
+        respond 404
+    }
+}

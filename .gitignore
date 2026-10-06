@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.venv/
+venv/
+
+# Runtime data and credentials
+.mcp.json
+*.db
+*.db-shm
+*.db-wal
+data/
+.agent/
+agent-config.json
+.env
+.env.*
+!.env.example
+
+# Build and editor output
+dist/
+build/
+node_modules/
+*.egg-info/
+.idea/
+.vscode/
+*.log
+

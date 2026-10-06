@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Remote Runtime</title>
+  <link rel="stylesheet" href="/assets/styles.css?v=0.99.3">
+</head>
+<body>
+  <main id="auth-view" class="auth-layout">
+    <section class="auth-brand">
+      <div class="brand-mark" aria-hidden="true">RR</div>
+      <div>
+        <h1>Remote Runtime</h1>
+        <p>管理你的远程执行环境</p>
+      </div>
+      <dl class="auth-status">
+        <div><dt>连接方式</dt><dd>主动出站</dd></div>
+        <div><dt>远程协议</dt><dd>Profile v1</dd></div>
+        <div><dt>MCP</dt><dd>Streamable HTTP</dd></div>
+      </dl>
+    </section>
+    <section class="auth-panel">
+      <div class="auth-box">
+        <div class="segmented" role="tablist" aria-label="账号操作">
+          <button id="login-tab" class="active" type="button">登录</button>
+          <button id="register-tab" type="button">注册</button>
+        </div>
+        <form id="auth-form">
+          <h2 id="auth-title">登录网关</h2>
+          <label>邮箱<input id="auth-email" type="email" autocomplete="email" required maxlength="254"></label>
+          <label>密码<input id="auth-password" type="password" autocomplete="current-password" required minlength="10" maxlength="128"></label>
+          <label id="auth-mfa-label" class="hidden">验证码<input id="auth-mfa" type="text" autocomplete="one-time-code" maxlength="64" placeholder="6 位动态码或恢复码"></label>
+          <p id="auth-error" class="form-error" role="alert"></p>
+          <button id="auth-submit" class="primary wide" type="submit">登录</button>
+        </form>
+      </div>
+    </section>
+  </main>
+
+  <div id="app-view" class="app-shell hidden">
+    <aside class="sidebar">
+      <div class="sidebar-brand"><span class="brand-mark small">RG</span><strong>Remote Gateway</strong></div>
+      <nav id="main-nav" aria-label="主导航">
+        <button class="active" data-view="overview" type="button"><span>01</span>概览</button>
+        <button data-view="builder" type="button"><span>02</span>Agent 工作台（推荐）</button>
+        <button data-view="agents" type="button"><span>03</span>远程 Agent</button>
+        <button data-view="keys" type="button"><span>04</span>MCP Keys</button>
+        <button data-view="tokens" type="button"><span>05</span>手动接入</button>
+      </nav>
+      <div class="sidebar-foot">
+        <span id="user-email"></span>
+        <button id="logout-button" class="text-button" type="button">退出登录</button>
+      </div>
+    </aside>
+
+    <div class="workspace">
+      <header class="topbar">
+        <button id="mobile-menu" class="icon-button" type="button" title="打开导航" aria-label="打开导航">☰</button>
+        <div><p id="page-eyebrow">Workspace</p><h1 id="page-title">概览</h1></div>
+        <button id="refresh-button" class="secondary" type="button">刷新</button>
+      </header>
+
+      <main class="content">
+        <section id="view-overview" class="view active">
+          <div class="metrics" id="metrics"></div>
+          <div class="section-heading"><div><h2>最近的 Agent</h2><p>当前账号下注册的远程执行环境</p></div><button class="primary" data-action="new-bundle" type="button">添加设备</button></div>
+          <div id="overview-agents" class="agent-list"></div>
+        </section>
+
+        <section id="view-builder" class="view">
+          <div class="section-heading"><div><h2>Agent 工作台</h2><p>选择可信 Profile，生成 Linux 一键接入命令或手工部署包</p></div><button class="primary" data-action="new-bundle" type="button">添加设备</button></div>
+          <div class="builder-intro">
+            <div><strong>固定 Core</strong><span>连接、认证、心跳、重连与请求路由</span></div>
+            <div><strong>按需 Profile</strong><span>只打包当前设备真正需要的标准能力</span></div>
+            <div><strong>一键接入</strong><span>Linux 目标机运行安装命令，再安全粘贴一次性 Token</span></div>
+          </div>
+          <div class="subsection-heading"><div><h3>可用 Profile</h3><p>目录由网关管理员维护，Agent 只能声明实际加载的 Handler</p></div></div>
+          <div id="profile-catalog" class="profile-catalog"></div>
+          <div class="subsection-heading"><div><h3>最近组装</h3><p>下载链接与注册令牌使用相同有效期</p></div></div>
+          <div id="bundles-list" class="data-list"></div>
+        </section>
+
+        <section id="view-agents" class="view">
+          <div class="section-heading"><div><h2>远程 Agent</h2><p>设备状态、用途和标准 Profile</p></div><button class="primary" data-action="new-bundle" type="button">添加设备</button></div>
+          <div id="agents-list" class="agent-list"></div>
+        </section>
+
+        <section id="view-keys" class="view">
+          <div class="section-heading"><div><h2>MCP Access Keys</h2><p>为 Claude、WorkBuddy 或其他 MCP 客户端分别创建凭据</p></div><button id="new-key-button" class="primary" type="button">创建 Key</button></div>
+          <div class="endpoint-band"><div><span>MCP Endpoint</span><code id="mcp-endpoint"></code></div><button class="secondary copy-endpoint" type="button">复制</button></div>
+          <div id="keys-list" class="data-list"></div>
+        </section>
+
+        <section id="view-tokens" class="view">
+          <div class="section-heading"><div><h2>手动接入（高级）</h2><p>只签发一次性 Enrollment Token，不生成 Agent 文件</p></div><button class="primary" data-action="new-token" type="button">仅创建 Token</button></div>
+          <div class="manual-notice"><div><strong>通常请使用 Agent 工作台</strong><p>只有已经持有兼容 Agent 程序，或使用自动化部署时，才需要在这里单独创建 Token。</p></div><button class="secondary" data-action="go-builder" type="button">前往工作台</button></div>
+          <div id="tokens-list" class="data-list"></div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <dialog id="form-dialog">
+    <form id="dialog-form" method="dialog">
+      <div class="dialog-head"><div><p id="dialog-eyebrow">Create</p><h2 id="dialog-title"></h2></div><button class="icon-button" data-action="close-form-dialog" aria-label="关闭" title="关闭" type="button">×</button></div>
+      <div id="dialog-fields"></div>
+      <p id="dialog-error" class="form-error"></p>
+      <div class="dialog-actions"><button class="secondary" data-action="close-form-dialog" type="button">取消</button><button id="dialog-submit" class="primary" value="default" type="submit">确认</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="secret-dialog">
+    <div class="dialog-head"><div><p>Shown once</p><h2 id="secret-title">凭据已创建</h2></div><button id="secret-close" class="icon-button" aria-label="关闭" title="关闭" type="button">×</button></div>
+    <p class="secret-warning">关闭后将无法再次查看，请立即保存到目标客户端。</p>
+    <label id="secret-label">Secret<textarea id="secret-value" readonly rows="3"></textarea></label>
+    <label id="command-block" class="hidden"><span id="command-label">启动命令</span><textarea id="command-value" readonly rows="5"></textarea></label>
+    <div class="dialog-actions"><button id="copy-secret" class="secondary" type="button">复制 Secret</button><button id="copy-command" class="primary hidden" type="button">复制启动命令</button></div>
+  </dialog>
+
+  <dialog id="agent-capabilities-dialog" class="capabilities-dialog">
+    <div class="dialog-head"><div><p>Agent Capabilities</p><h2 id="agent-capabilities-title"></h2></div><button id="agent-capabilities-close" class="icon-button" aria-label="关闭" title="关闭" type="button">×</button></div>
+    <div id="agent-capabilities-body" class="agent-capability-list"></div>
+    <div class="dialog-actions"><button id="agent-capabilities-done" class="primary" type="button">关闭</button></div>
+  </dialog>
+
+  <dialog id="profile-dialog" class="profile-dialog">
+    <div class="dialog-head"><div class="dialog-title"><button id="profile-dialog-back" class="icon-button hidden" aria-label="返回 Agent 能力" title="返回 Agent 能力" type="button">←</button><div><p id="profile-dialog-eyebrow">Profile Contract</p><h2 id="profile-dialog-title"></h2></div></div><button id="profile-dialog-close" class="icon-button" aria-label="关闭" title="关闭" type="button">×</button></div>
+    <div id="profile-dialog-body" class="protocol-detail"></div>
+    <div class="dialog-actions"><button id="profile-dialog-done" class="primary" type="button">关闭</button></div>
+  </dialog>
+
+  <div id="toast" role="status" aria-live="polite"></div>
+  <script src="/assets/app.js?v=0.99.3" defer></script>
+</body>
+</html>
