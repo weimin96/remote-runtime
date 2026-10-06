@@ -1,6 +1,6 @@
 {
   "name": "remote-ssh",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Run Codex commands on SSH hosts and watch the live terminal output.",
   "author": {
     "name": "Remote Runtime"

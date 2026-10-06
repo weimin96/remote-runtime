@@ -61,7 +61,7 @@ curl -fsSL https://raw.githubusercontent.com/weimin96/remote-runtime/main/instal
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/weimin96/remote-runtime/main/install-remote-ssh.sh \
-  | bash -s -- --version 1.0.0
+  | bash -s -- --version 1.0.1
 ```
 
 安装器会自动识别 macOS / Linux 与 CPU 架构，从 GitHub Release 下载对应平台 artifact，校验 SHA-256，然后注册 marketplace 并执行：

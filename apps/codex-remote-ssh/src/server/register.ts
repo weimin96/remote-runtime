@@ -1,8 +1,10 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { Icon } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod/v4";
 
 import { ExecutionBroker } from "./execution-broker.js";
 import { HostHealthRegistry } from "./host-health.js";
+import { remoteSshGlobalEntrypoint } from "./icons.js";
 import { discoverRemoteHosts, publicHost, type RemoteHost } from "./host-registry.js";
 import { ManagedHostInputSchema, managedHostsPath, removeManagedHost, saveManagedHost } from "./managed-hosts.js";
 import { PortForwardManager } from "./port-forward-manager.js";
@@ -55,7 +57,7 @@ async function mapWithConcurrency<T, R>(items: T[], concurrency: number, worker:
   return results;
 }
 
-export async function registerRemoteSsh(server: McpServer, broker: ExecutionBroker, forwards: PortForwardManager, health: HostHealthRegistry, html: string) {
+export async function registerRemoteSsh(server: McpServer, broker: ExecutionBroker, forwards: PortForwardManager, health: HostHealthRegistry, html: string, icons: Icon[]) {
   const sftp = new SftpClient();
   const hostsById = new Map<string, RemoteHost>();
   async function refreshHosts(): Promise<RemoteHost[]> {
@@ -101,7 +103,7 @@ export async function registerRemoteSsh(server: McpServer, broker: ExecutionBrok
       description: "Open the Remote SSH live terminal workspace.",
       inputSchema: z.object({}),
       annotations: readonly,
-      _meta: { ...ui(WORKSPACE_UI, [{ type: "global" }]), ui: { resourceUri: WORKSPACE_UI, visibility: ["app"] } },
+      _meta: { ...ui(WORKSPACE_UI, [remoteSshGlobalEntrypoint(icons)]), ui: { resourceUri: WORKSPACE_UI, visibility: ["app"] } },
     },
     async () => result({
       page: "terminal",

@@ -1194,7 +1194,7 @@ function AppRoot() {
         hostContext?: HostContext;
       }>("ui/initialize", {
         protocolVersion: "2026-01-26",
-        appInfo: { name: "remote-ssh", version: "1.0.0" },
+        appInfo: { name: "remote-ssh", version: "1.0.1" },
         appCapabilities: { tools: {}, availableDisplayModes: ["inline", "fullscreen"] },
       })
         .then((response) => {

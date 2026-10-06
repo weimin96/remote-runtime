@@ -1,6 +1,6 @@
 {
   "name": "codex-remote-ssh",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "type": "module",
   "engines": {
@@ -11,8 +11,8 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "tsx --test test/*.test.ts",
     "check": "npm run typecheck && npm test && npm run build",
-    "install:local": "node ./scripts/install-local.mjs",
-    "verify:local": "npm run check && npm run install:local"
+    "install:local": "npm run build && node ./scripts/install-local.mjs",
+    "verify:local": "npm run check && node ./scripts/install-local.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/ext-apps": "1.7.5",

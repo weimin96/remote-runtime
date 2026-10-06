@@ -1,8 +1,11 @@
 import { execFileSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import os from "node:os";
+import path from "node:path";
 
 const PLUGIN = "remote-ssh@remote-agent";
 const CACHE_PARENT = `${os.homedir()}/.codex/plugins/cache/remote-agent/`;
+const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
 
 function isRemoteSshRuntimeCwd(cwd) {
   if (!cwd.startsWith(CACHE_PARENT)) return false;
@@ -13,6 +16,33 @@ function isRemoteSshRuntimeCwd(cwd) {
 
 function commandOutput(command, args) {
   return execFileSync(command, args, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+}
+
+function marketplaceRoot(name) {
+  let output = "";
+  try {
+    output = commandOutput("codex", ["plugin", "marketplace", "list"]);
+  } catch {
+    return null;
+  }
+  for (const line of output.split("\n")) {
+    const match = line.match(/^([^\s]+)\s+(.+)$/);
+    if (match?.[1] === name) return match[2].trim();
+  }
+  return null;
+}
+
+function ensureLocalMarketplace() {
+  const current = marketplaceRoot("remote-agent");
+  if (current === REPO_ROOT) return;
+
+  if (current) {
+    console.log(`Switching remote-agent marketplace from ${current} to local checkout ${REPO_ROOT}…`);
+    execFileSync("codex", ["plugin", "marketplace", "remove", "remote-agent"], { stdio: "inherit" });
+  } else {
+    console.log(`Registering local remote-agent marketplace from ${REPO_ROOT}…`);
+  }
+  execFileSync("codex", ["plugin", "marketplace", "add", REPO_ROOT], { stdio: "inherit" });
 }
 
 function remoteSshRuntimePids() {
@@ -40,7 +70,8 @@ function remoteSshRuntimePids() {
   return pids;
 }
 
-console.log(`Installing ${PLUGIN} from the local marketplace…`);
+ensureLocalMarketplace();
+console.log(`Installing ${PLUGIN} from the local checkout…`);
 execFileSync("codex", ["plugin", "add", PLUGIN, "--json"], { stdio: "inherit" });
 
 const pids = remoteSshRuntimePids();
