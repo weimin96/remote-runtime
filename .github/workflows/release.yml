@@ -47,8 +47,15 @@ jobs:
         run: |
           .venv/bin/python -m compileall -q gateway remote_agent agent.py tests
           node --check gateway/static/app.js
-      - name: Check Remote SSH
-        run: npm --prefix apps/codex-remote-ssh run check
+      - name: Typecheck Remote SSH
+        timeout-minutes: 3
+        run: npm --prefix apps/codex-remote-ssh run typecheck
+      - name: Test Remote SSH
+        timeout-minutes: 3
+        run: npm --prefix apps/codex-remote-ssh test
+      - name: Build Remote SSH
+        timeout-minutes: 3
+        run: npm --prefix apps/codex-remote-ssh run build
       - name: Check Git whitespace
         run: git diff --check
       - name: Verify reproducible Linux artifacts
